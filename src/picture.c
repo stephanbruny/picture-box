@@ -81,7 +81,7 @@ static void set_temp_picture(GdkPixbuf* pixbuf, int width, int height) {
   if (tempPicture) {
     cairo_surface_destroy(tempPicture->surface);
     g_object_ref_sink(currentPicture);
-    g_object_unref(currentPicture);
+    g_object_run_dispose(currentPicture);
     g_free(tempPicture);
   }
   tempPicture = (picture_t*)g_malloc(sizeof(picture_t));

@@ -55,10 +55,20 @@ static void click_image( GtkWidget *widget, GdkEvent* ev, file_item_t* item) {
   gtk_widget_queue_draw(widget);
 }
 
+static void icon_destroy( GtkWidget *widget, file_item_t* item) {
+  g_print("Destroy\n");
+  g_object_ref_sink(item->image);
+  gtk_widget_destroy(item->image);
+  g_free(item);
+}
+
 static GtkImage* create_item_icon(char* filepath) {
   GdkPixbuf * pixBuf = gdk_pixbuf_new_from_file (filepath, NULL);
   GdkPixbuf * imgBuf = gdk_pixbuf_scale_simple(pixBuf, icon_image_width, icon_image_height, GDK_INTERP_BILINEAR);
-  return gtk_image_new_from_pixbuf(imgBuf);
+  GtkImage* result = gtk_image_new_from_pixbuf(imgBuf);
+  g_object_unref(pixBuf);
+  g_object_unref(imgBuf);
+  return result;
 }
 
 static void add_file_item_image(GtkContainer* container, GtkImage* icon, char* tooltip, void(*callback)(void), gpointer user_data) {
@@ -76,6 +86,13 @@ static void add_file_item_image(GtkContainer* container, GtkImage* icon, char* t
   gtk_widget_set_size_request(area, item->width, item->height);
 
   gtk_widget_set_tooltip_text(area, tooltip); 
+
+  g_signal_connect (
+    G_OBJECT(area), 
+    "destroy",
+    G_CALLBACK(icon_destroy), 
+    item
+  );
 
   g_signal_connect (
     G_OBJECT(area), 
@@ -113,12 +130,16 @@ static void add_file_item_image(GtkContainer* container, GtkImage* icon, char* t
 
 void add_file_item(GtkContainer* container, char* imagePath, char* tooltip, void(*callback)(void), gpointer user_data) {
   GtkImage* icon = create_item_icon(imagePath);
-  add_file_item_image(container, icon, tooltip, callback, user_data);
+  add_file_item_image(container, g_object_ref(icon), tooltip, callback, user_data);
+  g_object_unref(icon);
 };
 
 void add_file_item_from_surface(GtkContainer* container, cairo_surface_t* surface, char* tooltip, void(*callback)(void), gpointer user_data) {
   GdkPixbuf* pixbuf = gdk_pixbuf_get_from_surface(surface, 0, 0, cairo_image_surface_get_width (surface), cairo_image_surface_get_height (surface));
   GdkPixbuf * imgBuf = gdk_pixbuf_scale_simple(pixbuf, icon_image_width, icon_image_height, GDK_INTERP_BILINEAR);
   GtkImage* icon = gtk_image_new_from_pixbuf(imgBuf);
-  add_file_item_image(container, icon, tooltip, callback, user_data);
+  add_file_item_image(container, g_object_ref(icon), tooltip, callback, user_data);
+  g_object_unref(pixbuf);
+  g_object_unref(imgBuf);
+  g_object_unref(icon);
 }

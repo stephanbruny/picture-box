@@ -186,6 +186,7 @@ static void open_dir(folder_node_t* parent, char* path, char* name) {
   }
   gtk_widget_hide(infoLabel);
   gtk_widget_show(imageGrid);
+  g_dir_close(dir);
 }
 
 static void on_mount_added (GVolumeMonitor *volume_monitor,
