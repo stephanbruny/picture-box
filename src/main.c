@@ -12,6 +12,7 @@ static GtkBox* imageGrid = NULL;
 static GtkLabel* infoLabel = NULL;
 static GtkDrawingArea* pictureArea = NULL;
 static GtkBox* jobPicturesBox = NULL;
+static GtkScrolledWindow* toolbox = NULL;
 
 char* root_mount_dir;
 
@@ -30,6 +31,7 @@ typedef struct {
 
 /* local definitions */
 static void open_dir(folder_node_t* parent, char* path, char* name);
+static void on_render_pdf(cairo_surface_t* surface, int width, int height);
 
 static void hello( GtkWidget *widget,
                    gpointer   data )
@@ -46,6 +48,15 @@ static gboolean delete_event( GtkWidget *widget,
     return FALSE;
 }
 
+static void clear_container(GtkContainer* container) {
+  GList *children, *iter;
+
+  children = gtk_container_get_children(GTK_CONTAINER(container));
+  for(iter = children; iter != NULL; iter = g_list_next(iter))
+    gtk_widget_destroy(GTK_WIDGET(iter->data));
+  g_list_free(children);
+}
+
 /* Another callback */
 static void destroy( GtkWidget *widget, gpointer data )
 {
@@ -59,8 +70,16 @@ static void click_image( GtkWidget *widget, GdkEvent* ev, gchar* filename )
 }
 
 static void click_pdf ( GtkWidget *widget, GdkEvent* ev, gchar* filename ) {
-  set_current_picture(get_pdf_cairo_surface(filename, 0, A4_WIDTH_72, A4_HEIGHT_72), A4_WIDTH_72, A4_HEIGHT_72);
+  gpointer* doc = (gpointer*)g_malloc(sizeof(gpointer));
+  set_current_picture(get_pdf_cairo_surface(filename, 0, A4_WIDTH_72, A4_HEIGHT_72, doc), A4_WIDTH_72, A4_HEIGHT_72);
+  
+  clear_container(toolbox);
+  
+  gtk_container_add(GTK_CONTAINER(toolbox), get_pdf_toolbar(doc, on_render_pdf));
+  
   gtk_widget_queue_draw (pictureArea);
+  
+  gtk_widget_show_all(toolbox);
 }
 
 static void click_folder( GtkWidget *widget, GdkEvent* ev, folder_node_t* folder )
@@ -104,14 +123,7 @@ int startsWith(const char *pre, const char *str)
     return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
 }
 
-static void clear_container(GtkContainer* container) {
-  GList *children, *iter;
 
-  children = gtk_container_get_children(GTK_CONTAINER(container));
-  for(iter = children; iter != NULL; iter = g_list_next(iter))
-    gtk_widget_destroy(GTK_WIDGET(iter->data));
-  g_list_free(children);
-}
 
 folder_node_t* createFolder(folder_node_t* parent, char* path, char* name) {
   folder_node_t* newNode = (folder_node_t*)g_malloc(sizeof(folder_node_t));
@@ -191,6 +203,11 @@ static void init_device_control() {
   
 }
 
+static void on_render_pdf(cairo_surface_t* surface, int width, int height) {
+  set_current_picture(surface, width, height);
+  gtk_widget_queue_draw (pictureArea);
+}
+
 int main( int   argc,
           char *argv[] )
 {
@@ -227,21 +244,15 @@ int main( int   argc,
     GtkBox* pictureBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     jobPicturesBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     pictureArea = get_picture_area();
-    GtkBox* pictureEditBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    toolbox = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_min_content_width(toolbox, 216);
+    
     // gtk_box_pack_start (pictureBox, jobPicturesBox, TRUE, TRUE, 4);
     gtk_box_pack_start (pictureBox, pictureArea, TRUE, TRUE, 4);
-    gtk_box_pack_start (pictureBox, pictureEditBox, TRUE, TRUE, 4);
+    gtk_box_pack_start (pictureBox, toolbox, TRUE, TRUE, 4);
     
     imageGrid = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
     gtk_grid_set_column_spacing(imageGrid, 4);
-    
-    GtkButton* picture_fx_button = gtk_button_new_with_label ("FX");
-    GtkButton* picture_size_button = gtk_button_new_with_label ("Size");
-    GtkButton* picture_draw_button = gtk_button_new_with_label ("Draw");
-    
-    gtk_box_pack_start (pictureEditBox, picture_fx_button, TRUE, TRUE, 4);
-    gtk_box_pack_start (pictureEditBox, picture_size_button, TRUE, TRUE, 4);
-    gtk_box_pack_start (pictureEditBox, picture_draw_button, TRUE, TRUE, 4);
     
     infoLabel = gtk_label_new ("Bitte Speichermedium einführen");
     

@@ -106,6 +106,10 @@ void load_current_picture(char* filename) {
 }
 
 void set_current_picture(cairo_surface_t* surface, int width, int height) {
+  if (NULL == surface) {
+    load_current_picture("assets/error.png");
+    return;
+  }
   GdkPixbuf* pixbuf = gdk_pixbuf_get_from_surface(surface, 0, 0, width, height);
   set_temp_picture(pixbuf, width, height);
 }
