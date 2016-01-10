@@ -70,12 +70,11 @@ static void click_image( GtkWidget *widget, GdkEvent* ev, gchar* filename )
 }
 
 static void click_pdf ( GtkWidget *widget, GdkEvent* ev, gchar* filename ) {
-  gpointer* doc = (gpointer*)g_malloc(sizeof(gpointer));
-  set_current_picture(get_pdf_cairo_surface(filename, 0, A4_WIDTH_72, A4_HEIGHT_72, doc), A4_WIDTH_72, A4_HEIGHT_72);
+  set_current_picture(get_pdf_cairo_surface(filename, 0, A4_WIDTH_72, A4_HEIGHT_72), A4_WIDTH_72, A4_HEIGHT_72);
   
   clear_container(toolbox);
   
-  gtk_container_add(GTK_CONTAINER(toolbox), get_pdf_toolbar(doc, on_render_pdf));
+  gtk_container_add(GTK_CONTAINER(toolbox), get_pdf_toolbar(on_render_pdf));
   
   gtk_widget_queue_draw (pictureArea);
   
@@ -114,9 +113,6 @@ static void add_pdf(char* path, char* filename) {
   const char* pdfIcon = "assets/pdf.png";
   gchar* filePath = g_strconcat(path, "/", filename, NULL);
   cairo_surface_t* surf = get_pdf_thumbnail_cairo_surface(filePath, 128, 128);
-  if (NULL == surf) {
-    surf = get_pdf_cairo_surface(filePath, 0, A4_WIDTH_72, A4_HEIGHT_72, NULL);
-  }
   if (NULL == surf) {
     add_file_item(imageGrid, pdfIcon, filename, click_pdf, filePath);
     return;

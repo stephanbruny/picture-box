@@ -11,12 +11,20 @@ typedef struct {
   GtkWidget* page_label;
 } document_page_t;
 
+static document_page_t* currentDocument = NULL;
+
+static void free_doc() {
+  g_print("Free doc");
+  g_object_unref(currentDocument->doc);
+  cairo_surface_destroy(currentDocument->surface);
+  g_free(currentDocument);
+}
+
 static void render_pdf_page(
   PopplerDocument* doc, 
   int n_page, 
   cairo_surface_t* surface, 
-  int width, int height, 
-  cairo_surface_t*(*render_func)(PopplerPage*, cairo_t*)
+  int width, int height
 ) {
   PopplerPage* page = poppler_document_get_page(doc, n_page);
   cairo_t* cr = cairo_create(surface);
@@ -24,10 +32,15 @@ static void render_pdf_page(
   cairo_set_source_rgb(cr, 1, 1, 1);
   cairo_fill(cr);
   cairo_paint(cr);
-  render_func(page, cr);
+  poppler_page_render(page, cr);
+  g_object_unref(page);
+  cairo_destroy(cr);
 }
 
-cairo_surface_t* get_pdf_cairo_surface(char* filename, int n_page, int width, int height, gpointer* document) {
+cairo_surface_t* get_pdf_cairo_surface(char* filename, int n_page, int width, int height) {
+  if (NULL != currentDocument) {
+    free_doc(); 
+  }
   PopplerDocument* doc;
   GError* err = NULL;
   
@@ -41,17 +54,15 @@ cairo_surface_t* get_pdf_cairo_surface(char* filename, int n_page, int width, in
   }
   
   cairo_surface_t* result = cairo_image_surface_create(CAIRO_FORMAT_RGB24, width, height);
-  render_pdf_page(doc, n_page, result, width, height, poppler_page_render);
+  render_pdf_page(doc, n_page, result, width, height);
 
-  document_page_t* doc_page = (document_page_t*)g_malloc(sizeof(document_page_t));
-  doc_page->doc = doc;
-  doc_page->page = 0;
-  doc_page->page_count = poppler_document_get_n_pages(doc);
-  doc_page->surface = result;
-  doc_page->width = width;
-  doc_page->height = height;
-  
-  if (NULL != document) *document = doc_page;
+  currentDocument = (document_page_t*)g_malloc(sizeof(document_page_t));
+  currentDocument->doc = doc;
+  currentDocument->page = 0;
+  currentDocument->page_count = poppler_document_get_n_pages(doc);
+  currentDocument->surface = result;
+  currentDocument->width = width;
+  currentDocument->height = height;
   
   return result;
 }
@@ -69,7 +80,14 @@ cairo_surface_t* get_pdf_thumbnail_cairo_surface(char* filename, int width, int 
     return NULL;
   }
   PopplerPage* page = poppler_document_get_page(doc, 0);
-  return poppler_page_get_thumbnail(page);
+  cairo_surface_t* result = poppler_page_get_thumbnail(page);
+  if (NULL == result) {
+    result = cairo_image_surface_create(CAIRO_FORMAT_RGB24, width, height);
+    render_pdf_page(doc, 0, result, width, height);
+  }
+  g_object_unref(doc);
+  g_object_unref(page);
+  return result;
 }
 
 static void get_page_label_text(GtkWidget* label, document_page_t* doc_page) {
@@ -80,7 +98,7 @@ static void get_page_label_text(GtkWidget* label, document_page_t* doc_page) {
 }
 
 static void render_doc_page(document_page_t* doc_page) {
-  render_pdf_page(doc_page->doc, doc_page->page, doc_page->surface, doc_page->width, doc_page->height, poppler_page_render);
+  render_pdf_page(doc_page->doc, doc_page->page, doc_page->surface, doc_page->width, doc_page->height);
   doc_page->on_render(doc_page->surface, doc_page->width, doc_page->height);
   get_page_label_text(doc_page->page_label, doc_page);
 }
@@ -99,12 +117,11 @@ static void click_next_button( GtkWidget *widget, GdkEvent* ev, document_page_t*
   render_doc_page(doc_page);
 }
 
-GtkWidget* get_pdf_toolbar(gpointer* p_doc, void(*callback)(gpointer, int, int)) {
-  document_page_t* doc_page = (document_page_t*)*p_doc;
-  doc_page->on_render = callback;
+GtkWidget* get_pdf_toolbar(void(*callback)(gpointer, int, int)) {
+  currentDocument->on_render = callback;
   GtkBox* vBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
   
-  GtkWidget* titleLabel = gtk_label_new(poppler_document_get_title(doc_page->doc));
+  GtkWidget* titleLabel = gtk_label_new(poppler_document_get_title(currentDocument->doc));
   
   gtk_box_pack_start (vBox, titleLabel, FALSE, FALSE, 4);
   
@@ -112,15 +129,15 @@ GtkWidget* get_pdf_toolbar(gpointer* p_doc, void(*callback)(gpointer, int, int))
   
   GtkButton* button_prev = gtk_button_new_with_label("<");
   GtkWidget* label_page = gtk_label_new("PAGE");
-  get_page_label_text(label_page, doc_page);
-  doc_page->page_label = label_page;
+  get_page_label_text(label_page, currentDocument);
+  currentDocument->page_label = label_page;
   GtkButton* button_next = gtk_button_new_with_label(">");
   
   g_signal_connect (button_prev, "clicked",
-		      G_CALLBACK (click_prev_button), doc_page);
+		      G_CALLBACK (click_prev_button), currentDocument);
   
   g_signal_connect (button_next, "clicked",
-		      G_CALLBACK (click_next_button), doc_page);
+		      G_CALLBACK (click_next_button), currentDocument);
   
   gtk_box_pack_start (hBox, button_prev, FALSE, FALSE, 2);
   gtk_box_pack_start (hBox, label_page, FALSE, FALSE, 2);

@@ -18,7 +18,6 @@ static gboolean
 draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
 {
   guint width, height;
-  GdkRGBA color;
 
   width = gtk_widget_get_allocated_width (widget);
   height = gtk_widget_get_allocated_height (widget);
@@ -54,16 +53,6 @@ draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
     cairo_paint(cr);
     return TRUE;
   }
-  
-  cairo_arc (cr,
-             width / 2.0, height / 2.0,
-             MIN (width, height) / 2.0,
-             0, 2 * G_PI);
-
-  gtk_style_context_get_color (gtk_widget_get_style_context (widget),
-                               0,
-                               &color);
-  gdk_cairo_set_source_rgba (cr, &color);
 
   cairo_fill (cr);
 
@@ -90,6 +79,9 @@ static void draw_pixbuf(picture_t* pic, GdkPixbuf* pixBuf) {
 
 static void set_temp_picture(GdkPixbuf* pixbuf, int width, int height) {
   if (tempPicture) {
+    cairo_surface_destroy(tempPicture->surface);
+    g_object_ref_sink(currentPicture);
+    g_object_unref(currentPicture);
     g_free(tempPicture);
   }
   tempPicture = (picture_t*)g_malloc(sizeof(picture_t));
@@ -98,11 +90,13 @@ static void set_temp_picture(GdkPixbuf* pixbuf, int width, int height) {
   tempPicture->surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, width, height);
   draw_pixbuf(tempPicture, pixbuf);
   currentPicture = gtk_image_new_from_pixbuf(pixbuf);
+  g_object_unref(pixbuf);
 }
 
 void load_current_picture(char* filename) {
   GdkPixbuf * pixBuf = gdk_pixbuf_new_from_file (filename, NULL);
-  set_temp_picture(pixBuf, gdk_pixbuf_get_width(pixBuf), gdk_pixbuf_get_height(pixBuf));
+  set_temp_picture(g_object_ref(pixBuf), gdk_pixbuf_get_width(pixBuf), gdk_pixbuf_get_height(pixBuf));
+  g_object_unref(pixBuf);
 }
 
 void set_current_picture(cairo_surface_t* surface, int width, int height) {
@@ -111,7 +105,8 @@ void set_current_picture(cairo_surface_t* surface, int width, int height) {
     return;
   }
   GdkPixbuf* pixbuf = gdk_pixbuf_get_from_surface(surface, 0, 0, width, height);
-  set_temp_picture(pixbuf, width, height);
+  set_temp_picture(g_object_ref(pixbuf), width, height);
+  g_object_unref(pixbuf);
 }
 
 GtkImage* get_current_picture() {
