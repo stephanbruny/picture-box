@@ -88,19 +88,26 @@ static void draw_pixbuf(picture_t* pic, GdkPixbuf* pixBuf) {
   cairo_destroy(cr);
 }
 
-void load_current_picture(char* filename) {
-  GdkPixbuf * pixBuf = gdk_pixbuf_new_from_file (filename, NULL);
-  
-  if (NULL != tempPicture) {
+static void set_temp_picture(GdkPixbuf* pixbuf, int width, int height) {
+  if (tempPicture) {
     g_free(tempPicture);
   }
-  
   tempPicture = (picture_t*)g_malloc(sizeof(picture_t));
-  tempPicture->width = gdk_pixbuf_get_width(pixBuf);
-  tempPicture->height = gdk_pixbuf_get_height(pixBuf);
-  tempPicture->surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, tempPicture->width, tempPicture->height);
-  draw_pixbuf(tempPicture, pixBuf);
-  currentPicture = gtk_image_new_from_pixbuf(pixBuf);
+  tempPicture->width = gdk_pixbuf_get_width(pixbuf);
+  tempPicture->height = gdk_pixbuf_get_height(pixbuf);
+  tempPicture->surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, width, height);
+  draw_pixbuf(tempPicture, pixbuf);
+  currentPicture = gtk_image_new_from_pixbuf(pixbuf);
+}
+
+void load_current_picture(char* filename) {
+  GdkPixbuf * pixBuf = gdk_pixbuf_new_from_file (filename, NULL);
+  set_temp_picture(pixBuf, gdk_pixbuf_get_width(pixBuf), gdk_pixbuf_get_height(pixBuf));
+}
+
+void set_current_picture(cairo_surface_t* surface, int width, int height) {
+  GdkPixbuf* pixbuf = gdk_pixbuf_get_from_surface(surface, 0, 0, width, height);
+  set_temp_picture(pixbuf, width, height);
 }
 
 GtkImage* get_current_picture() {

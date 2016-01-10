@@ -4,6 +4,7 @@
 
 #include "picture.h"
 #include "file-select.h"
+#include "pdf.h"
 
 /* static local ui elements */
 static GtkWindow* _mainWindow = NULL;
@@ -13,6 +14,9 @@ static GtkDrawingArea* pictureArea = NULL;
 static GtkBox* jobPicturesBox = NULL;
 
 char* root_mount_dir;
+
+#define A4_WIDTH_72 595
+#define A4_HEIGHT_72 842
 
 typedef struct {
   char* path;
@@ -54,6 +58,11 @@ static void click_image( GtkWidget *widget, GdkEvent* ev, gchar* filename )
   gtk_widget_queue_draw (pictureArea);
 }
 
+static void click_pdf ( GtkWidget *widget, GdkEvent* ev, gchar* filename ) {
+  set_current_picture(get_pdf_cairo_surface(filename, 0, A4_WIDTH_72, A4_HEIGHT_72), A4_WIDTH_72, A4_HEIGHT_72);
+  gtk_widget_queue_draw (pictureArea);
+}
+
 static void click_folder( GtkWidget *widget, GdkEvent* ev, folder_node_t* folder )
 {
   open_dir(folder->prev, folder->data->path, folder->data->name);
@@ -82,6 +91,12 @@ static void add_folder(folder_node_t* node, char* icon) {
   add_file_item(imageGrid, folderIcon, node->data->name ? node->data->name : node->data->path, click_folder, node);
 }
 
+static void add_pdf(char* path, char* filename) {
+  const char* pdfIcon = "assets/pdf.png";
+  gchar* filePath = g_strconcat(path, "/", filename, NULL);
+  add_file_item(imageGrid, pdfIcon, filename, click_pdf, filePath);
+}
+
 int startsWith(const char *pre, const char *str)
 {
     size_t lenpre = strlen(pre),
@@ -102,7 +117,7 @@ folder_node_t* createFolder(folder_node_t* parent, char* path, char* name) {
   folder_node_t* newNode = (folder_node_t*)g_malloc(sizeof(folder_node_t));
   
   newNode->data = (folder_t*)g_malloc(sizeof(folder_t));
-  newNode->data->path = path;
+  newNode->data->path = (parent) ? g_strconcat(parent->data->path, "/", name, NULL) : path;
   newNode->data->name = name ? name : path;
   newNode->prev = parent;
   
@@ -145,6 +160,9 @@ static void open_dir(folder_node_t* parent, char* path, char* name) {
       g_print("\n");
       if (startsWith("image/", (const char*)mime_type)) {
         add_image(path, filename);
+      }
+      if (startsWith("application/pdf", (const char*)mime_type)) {
+        add_pdf(path, filename);
       }
       g_free(mime_type);
     }
