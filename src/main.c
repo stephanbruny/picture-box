@@ -113,7 +113,15 @@ static void add_folder(folder_node_t* node, char* icon) {
 static void add_pdf(char* path, char* filename) {
   const char* pdfIcon = "assets/pdf.png";
   gchar* filePath = g_strconcat(path, "/", filename, NULL);
-  add_file_item(imageGrid, pdfIcon, filename, click_pdf, filePath);
+  cairo_surface_t* surf = get_pdf_thumbnail_cairo_surface(filePath, 128, 128);
+  if (NULL == surf) {
+    surf = get_pdf_cairo_surface(filePath, 0, A4_WIDTH_72, A4_HEIGHT_72, NULL);
+  }
+  if (NULL == surf) {
+    add_file_item(imageGrid, pdfIcon, filename, click_pdf, filePath);
+    return;
+  }
+  add_file_item_from_surface(imageGrid, surf, filename, click_pdf, filePath);
 }
 
 int startsWith(const char *pre, const char *str)
